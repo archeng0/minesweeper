@@ -3,6 +3,8 @@ import time
 import math
 import cProfile
 from PIL import Image
+from row_echelon import *
+import numpy as np
 
 pyautogui.FAILSAFE = True
 
@@ -14,6 +16,7 @@ class Tile:
     loc: Coord
     value: int # -2 = bomb, -1 = covered, 0 = blank, number is number
     covered: bool
+    checked: bool
 
 mode = 'easy_half'
 # mode = 'hard_full'
@@ -100,6 +103,7 @@ def init_board():
             tile = board[j][i]
             tile.value = -1
             tile.loc = Coord()
+            tile.checked = False
             tile.loc.x = int(TRX_INIT + i*XOFFSET)
             tile.loc.y = int(TRY_INIT + j*YOFFSET)
     return board
@@ -127,9 +131,9 @@ def scan(board):
 def get_neighbors(i,j):
     ret = []
     if i == 0:
-        start_x = i
+        start_x = 0
         end_x = i+1
-    elif i == LEN:
+    elif i == LEN-1:
         start_x = i-1
         end_x = i
     else:
@@ -139,7 +143,7 @@ def get_neighbors(i,j):
     if j == 0:
         start_y = j
         end_y = j+1
-    elif j == LEN:
+    elif j == HEIGHT-1:
         start_y = j-1
         end_y = j
     else:
@@ -153,6 +157,7 @@ def get_neighbors(i,j):
     
     return ret
 
+#takes a board and returns matrix for unknown squares in ROE form, and dictionary of values
 def create_mat(board):
     dic = {}
     idx = 0
@@ -161,22 +166,89 @@ def create_mat(board):
             tile = board[j][i]
             val = tile.value
 
-            if val < 1:
+            if val < 1 or tile.checked:
                 continue
 
             adj = get_neighbors(i,j)
             for (x,y) in adj:
+
                 curr = board[y][x]
                 if curr.value == -1:
                     if (x,y) not in dic:
                         dic[(x,y)] = idx
                         idx += 1
-    check_mat(dic)
 
-def check_mat(dic):
+    mat_len = len(dic) + 1
+    mat = np.empty((0,mat_len))
+
+    for j in range(HEIGHT):
+        for i in range(LEN):
+            tile = board[j][i]
+            val = tile.value
+
+            if val < 1 or tile.checked:
+                continue
+
+            adj = get_neighbors(i,j)
+            row = [0 for i in range(mat_len)]
+            for (x,y) in adj:
+                if (x,y) in dic:
+                    row[dic[(x,y)]] = 1
+            
+            row[-1] = val
+            mat = np.vstack([mat,row])
+
+    print(dic)
+    return row_echelon_form(mat)
+
+# takes ROE matrix and board to get mines from matrix, sets board values accordingly
+def find_mines(mat, board):
+    mines = []
+    clear = []
+    to_check = []
+
+    rows, cols = mat.shape
+    for i in range(rows):
+        row = mat[[i],:][0]
+        # print(row)
+        squares = row[:-1]
+        val = row[-1]
+
+        # skip rows with no info
+        sum_sq = np.sum(squares)
+        if sum_sq == 0:
+            continue
+        
+        # if val == 0:
+            # all 1's are clear
+        
+        # if sum_sq == val:
+            # all 1's are mines
+
+        # to_check.append(row)
+    
+    # keep looping over until list is empty, or no changes made (no new info)
+    changes = False
+    while not to_check:
+        # if changes made, set changes to True
+
+        if not changes:
+            break
+
+
+
+        # get easy ones, where last val is 0, or sum is last value (all mines)
+        # print(squares)
+        # print(np.sum(row))
+        
+
+
+def check_squares_around(dic):
     board = init_board()
     for (x,y) in dic:
         board[y][x].value = 1
-
     print_board(board)
+
+
+
 
