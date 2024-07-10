@@ -15,7 +15,7 @@ class Coord:
 class Tile:
     loc: Coord
     value: int # -2 = bomb, -1 = covered, 0 = blank, number is number
-    covered: bool
+    covered: bool # not in use
     checked: bool
 
 mode = 'easy_half'
@@ -95,7 +95,7 @@ def check_num(loc, img):
             return val
     return 0
 
-# initialize board with coords
+# initialize board with coords (a 2D array of Tiles)
 def init_board():
     board = [[Tile() for i in range(LEN)] for j in range(HEIGHT)]
     for j in range(HEIGHT):
@@ -198,49 +198,81 @@ def create_mat(board):
             row[-1] = val
             mat = np.vstack([mat,row])
 
-    print(dic)
-    return row_echelon_form(mat)
+    # print(dic)
+    return row_echelon_form(mat), dic
 
-# takes ROE matrix and board to get mines from matrix, sets board values accordingly
-def find_mines(mat, board):
+# gets the loc in an x,y pair fron dic using the value
+def get_key(val, dic):
+   
+    for key, value in dic.items():
+        if val == value:
+            return key[0], key[1]
+        
+# takes ROE matrix, board and dictionary to get mines from matrix, sets board values accordingly
+def find_mines(mat, board, dic):
+    rows, cols = mat.shape
+    to_check = np.empty((0, cols))
+    for row in mat:
+        # skip rows with no info
+        if np.sum(row) == 0:
+            continue
+        to_check = np.vstack((to_check, row))
+
     mines = []
     clear = []
-    to_check = []
 
-    rows, cols = mat.shape
-    for i in range(rows):
-        row = mat[[i],:][0]
-        # print(row)
-        squares = row[:-1]
-        val = row[-1]
+    # keep looping over until no changes made (no new info)
+    while True:
+        original = mines + clear
 
-        # skip rows with no info
-        sum_sq = np.sum(squares)
-        if sum_sq == 0:
-            continue
-        
-        # if val == 0:
-            # all 1's are clear
-        
-        # if sum_sq == val:
-            # all 1's are mines
+        for row in to_check:
+            val = row[-1]
 
-        # to_check.append(row)
-    
-    # keep looping over until list is empty, or no changes made (no new info)
-    changes = False
-    while not to_check:
-        # if changes made, set changes to True
+            if val == 0:
+                # all 1's are clear
+                for i in range(cols):
+                    if row[i]: #non-zero
+                        if i not in clear: clear.append(i)
+                # to_check = np.delete(to_check, (0), axis = 0) #delete rows with no more info?
+            
+            else:
+                squares = row[:-1]
+                checking = []
 
-        if not changes:
+                for i in range(cols-1):
+                    # check all non-zeros
+                    curr = squares[i]
+                    if curr and (i not in clear): 
+                        if i not in mines: checking.append(i)
+                        else: val -= 1
+
+                if val == 0:
+                    for i in checking:
+                        clear.append(i)
+
+                elif len(checking) == val:
+                    for i in checking:
+                        mines.append(i)
+
+        if mines + clear == original:
             break
 
+    # click all the clear squares
+    for i in clear:
+        x,y = get_key(i, dic)
+        tile = board[y][x]
+        loc = tile.loc
+        x = loc.x
+        y = loc.y
+        pyautogui.click(x,y)
 
+        # update board info ?
 
-        # get easy ones, where last val is 0, or sum is last value (all mines)
-        # print(squares)
-        # print(np.sum(row))
+    for i in mines:
+        x,y = get_key(i, dic)
+        board[y][x].value = -2
         
+
 
 
 def check_squares_around(dic):
@@ -248,7 +280,3 @@ def check_squares_around(dic):
     for (x,y) in dic:
         board[y][x].value = 1
     print_board(board)
-
-
-
-
